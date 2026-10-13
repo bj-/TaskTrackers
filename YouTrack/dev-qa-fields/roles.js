@@ -21,9 +21,17 @@ function roleByGroup(user) {
   return null; // ни в одной группе или в обеих — решаем по контексту
 }
 
-function roleByState(state) {
-  if (byName(state, config.DEVELOPER_STATES)) return DEVELOPER;
-  if (byName(state, config.TESTER_STATES)) return TESTER;
+function statesFor(project) {
+  const overrides = config.PROJECT_STATES || {};
+  const custom = project && (overrides[project.name] || overrides[project.shortName]);
+  if (custom) return { developer: custom.developer || [], tester: custom.tester || [] };
+  return { developer: config.DEVELOPER_STATES, tester: config.TESTER_STATES };
+}
+
+function roleByState(state, project) {
+  const states = statesFor(project);
+  if (byName(state, states.developer)) return DEVELOPER;
+  if (byName(state, states.tester)) return TESTER;
   return null;
 }
 
@@ -35,10 +43,11 @@ function roleByWorkType(type) {
 
 /**
  * Определяет роль пользователя в задаче.
- * Порядок: группа пользователя -> тип работы (для списания времени) -> состояние задачи.
+ * Порядок: группа пользователя -> тип работы (для списания времени) -> состояние задачи
+ * (с учётом настроек проекта из PROJECT_STATES).
  */
-exports.detectRole = function (user, state, workType) {
-  return roleByGroup(user) || roleByWorkType(workType) || roleByState(state);
+exports.detectRole = function (user, state, workType, project) {
+  return roleByGroup(user) || roleByWorkType(workType) || roleByState(state, project);
 };
 
 /**

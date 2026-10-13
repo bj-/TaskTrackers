@@ -12,7 +12,7 @@ exports.rule = entities.Issue.onChange({
     issue.workItems.added.forEach(function (workItem) {
       const author = workItem.author;
       if (!author) return;
-      const role = roles.detectRole(author, issue.fields.State, workItem.type);
+      const role = roles.detectRole(author, issue.fields.State, workItem.type, issue.project);
       // Только если поле ещё пустое — назначение имеет приоритет над списанием времени.
       roles.applyRole(issue, role, author, false);
     });

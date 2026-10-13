@@ -15,7 +15,7 @@ exports.rule = entities.Issue.onChange({
     const issue = ctx.issue;
     const assignee = issue.fields.Assignee;
     // Берём новое значение State — состояние могло поменяться в той же транзакции.
-    const role = roles.detectRole(assignee, issue.fields.State, null);
+    const role = roles.detectRole(assignee, issue.fields.State, null, issue.project);
     roles.applyRole(issue, role, assignee, config.OVERWRITE_ON_ASSIGN);
   },
   requirements: require('./requirements').requirements

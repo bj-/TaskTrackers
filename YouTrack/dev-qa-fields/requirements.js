@@ -7,7 +7,8 @@ exports.requirements = {
     type: entities.User.fieldType
   },
   State: {
-    type: entities.State.fieldType
+    type: entities.State.fieldType,
+    name: config.STATE_FIELD
   },
   Developer: {
     type: entities.User.fieldType,
