@@ -1,7 +1,7 @@
 {
-  "name": "@viiitech/dev-qa-fields",
+  "name": "@viiitech/autofill-dev-qa-fields",
   "version": "1.0.0",
-  "title": "Разработчик / Тестировщик по задаче",
+  "title": "Autofill-dev-qa-fields: Разработчик / Тестировщик",
   "description": "Автоматически заполняет поля «Разработчик» и «Тестировщик» при назначении исполнителя или при списании времени.",
   "author": "viiitech"
 }

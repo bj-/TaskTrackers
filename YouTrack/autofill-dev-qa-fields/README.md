@@ -31,9 +31,9 @@
    иначе запись пользователя вне набора приведёт к ошибке и откату изменения.
 2. Собрать архив (из папки `TaskTrackers\YouTrack`):
    ```powershell
-   Compress-Archive -Path .\dev-qa-fields\* -DestinationPath .\dev-qa-fields.zip -Force
+   Compress-Archive -Path .\autofill-dev-qa-fields\* -DestinationPath .\autofill-dev-qa-fields.zip -Force
    ```
-3. YouTrack → Administration → Workflows → **Import workflow** → выбрать `dev-qa-fields.zip`.
+3. YouTrack → Administration → Workflows → **Import workflow** → выбрать `autofill-dev-qa-fields.zip`.
 4. Привязать workflow к нужным проектам (Attach to project) и убедиться, что все правила включены
    и нет предупреждений о неудовлетворённых requirements.
 
