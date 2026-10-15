@@ -1,0 +1,10 @@
+{
+  "name" : "remaining_estimate_calculate",
+  "title" : "Remaining Time Calculate",
+  "version" : "0.0.1",
+  "visual" : true,
+  "vendor" : {
+    "name" : "Andrey Smirnov",
+    "email" : "a.smirnov@viiitech.ru"
+  }
+}

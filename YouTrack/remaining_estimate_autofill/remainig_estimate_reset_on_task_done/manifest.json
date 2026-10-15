@@ -1,0 +1,9 @@
+{
+  "name" : "remainig_estimate_reset_on_task_done",
+  "title" : "Remainig estimate reset on task is done",
+  "version" : "0.0.1",
+  "vendor" : {
+    "name" : "Andrey Smirnov",
+    "email" : "a.smirnov@viiitech.ru"
+  }
+}
