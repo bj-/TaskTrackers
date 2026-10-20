@@ -22,6 +22,7 @@
 | `python yt.py search "project: BA Type: Bug авторизация" [--top 20]` | Поиск (язык запросов YouTrack) |
 | `python yt.py show BA-12 [--json]` | Поля, связи, описание, комментарии |
 | `python yt.py comment BA-12 --file c.md [--apply]` | Комментарий; первой строкой добавляется заголовок `## AI` |
+| `python yt.py comment-insert BA-12 7-58 --after "строка1" --text "..." [--apply]` | Вставить строку с `**AI:**` в существующий комментарий после строки с подстрокой; в списке — тем же маркером |
 | `python yt.py append BA-12 --file d.md [--inline] [--apply]` | Дописать в описание раздел `## AI` (или строку с `**AI:**`); старый текст не меняется |
 | `python yt.py create --project BA --summary "..." --file bug.md --command "Type Bug" --link "relates to BA-12" [--apply]` | Новая задача с тегом `AI` (`--no-tag` — без) |
 | `python yt.py link BA-40 "relates to" BA-12 [--apply]` | Связь: `relates to`, `depends on`, `is required for`, `duplicates`, `subtask of`, `parent for` |

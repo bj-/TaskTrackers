@@ -140,6 +140,24 @@ def cmd_comment(args):
         print("Добавлен комментарий", c["id"])
 
 
+def cmd_comment_insert(args):
+    text = read_text(args)
+    c = api("GET", f"/issues/{args.id}/comments/{args.comment_id}", {"fields": "text"})
+    lines = c["text"].split("\n")
+    pos = next((n for n, l in enumerate(lines) if args.after in l), None)
+    if pos is None:
+        sys.exit(f"В комментарии {args.comment_id} нет строки с «{args.after}»")
+    # строка списка - вставляем тем же маркером, чтобы не разорвать список
+    marker = re.match(r"\s*(?:[*+-]|\d+[.)])\s+", lines[pos])
+    line = (marker.group(0) if marker else "") + (text if text.startswith(AI_PREFIX.strip()) else AI_PREFIX + text)
+    new = lines[:pos + 1] + [line] + lines[pos + 1:]
+    draft(f"вставка строки в комментарий {args.comment_id} задачи {args.id}",
+          [("+ " if n == pos + 1 else "  ") + l for n, l in enumerate(new)], args.apply)
+    if args.apply:
+        api("POST", f"/issues/{args.id}/comments/{args.comment_id}", {"fields": "id"}, {"text": "\n".join(new)})
+        print("Комментарий изменён")
+
+
 def cmd_append(args):
     text = read_text(args)
     i = api("GET", f"/issues/{args.id}", {"fields": "description"})
@@ -219,7 +237,14 @@ def main():
     with_text(p)
     p.set_defaults(fn=cmd_comment)
 
-    p = sub.add_parser("append", help=f"дописать в описание раздел '{AI_SECTION}' (или строку с --inline)")
+    p = sub.add_parser("comment-insert", help=f"вставить строку с {AI_PREFIX.strip()} в существующий комментарий")
+    p.add_argument("id")
+    p.add_argument("comment_id", help="id комментария, напр. 7-58 (см. show)")
+    p.add_argument("--after", required=True, help="подстрока строки, после которой вставить")
+    with_text(p)
+    p.set_defaults(fn=cmd_comment_insert)
+
+    p = sub.add_parser("append",help=f"дописать в описание раздел '{AI_SECTION}' (или строку с --inline)")
     p.add_argument("id")
     p.add_argument("--inline", action="store_true", help=f"строка с префиксом {AI_PREFIX.strip()} вместо раздела")
     with_text(p)
