@@ -132,8 +132,8 @@ def run_command(issue_ids, query):
 
 def cmd_comment(args):
     text = read_text(args)
-    if not text.startswith(AI_PREFIX.strip()):
-        text = AI_PREFIX + text
+    if not text.startswith((AI_SECTION, AI_PREFIX.strip())):
+        text = f"{AI_SECTION}\n\n{text}"
     draft(f"комментарий к {args.id}", [text], args.apply)
     if args.apply:
         c = api("POST", f"/issues/{args.id}/comments", {"fields": "id"}, {"text": text})
@@ -214,7 +214,7 @@ def main():
         p.add_argument("--file", help="текст из файла (UTF-8)")
         p.add_argument("--apply", action="store_true", help="отправить (без него - только черновик)")
 
-    p = sub.add_parser("comment", help=f"комментарий с префиксом {AI_PREFIX.strip()}")
+    p = sub.add_parser("comment", help=f"комментарий с заголовком '{AI_SECTION}' первой строкой")
     p.add_argument("id")
     with_text(p)
     p.set_defaults(fn=cmd_comment)
