@@ -101,8 +101,14 @@ def cmd_search(args):
     print(f"Найдено: {len(issues)} (показано не больше {args.top})")
 
 
+RESTRICTED_TAG = "ai-restricted"   # описание и комментарии задачи ассистенту не читать (ADR Test-Library 0008)
+
+
 def cmd_show(args):
     i = api("GET", f"/issues/{args.id}", {"fields": ISSUE_FIELDS})
+    if RESTRICTED_TAG in {t["name"] for t in i.get("tags") or []} and not args.human:
+        i["description"] = f"[скрыто: тег {RESTRICTED_TAG} - описание читает человек; показать: --human]"
+        i["comments"] = []
     if args.json:
         print(json.dumps(i, ensure_ascii=False, indent=2))
         return
@@ -225,6 +231,7 @@ def main():
     p = sub.add_parser("show", help="задача целиком: поля, связи, описание, комментарии")
     p.add_argument("id")
     p.add_argument("--json", action="store_true")
+    p.add_argument("--human", action="store_true", help=f"показать описание задачи с тегом {RESTRICTED_TAG} (запускает человек)")
     p.set_defaults(fn=cmd_show)
 
     def with_text(p):
