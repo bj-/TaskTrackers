@@ -1,6 +1,7 @@
 # YouTrack
 
-Workflow-скрипты YouTrack. Каждый workflow — отдельная папка с `package.json` и `README.md`.
+Workflow-скрипты YouTrack (каждый — отдельная папка с `package.json` и `README.md`) и `yt/` — скрипт работы Claude
+с YouTrack через API (`yt/README.md`; правила доступа — `AI-Memory/memory/youtrack-access.md`).
 
 ## autofill-dev-qa-fields
 
