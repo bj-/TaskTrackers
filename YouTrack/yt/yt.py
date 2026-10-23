@@ -92,12 +92,31 @@ def cmd_me(args):
     print(me["login"], "-", me["name"])
 
 
+GROUP_PREFIX = "sg-"   # тег группы безопасности (ADR Test-Library 0011): сессия группы читает только свои задачи
+
+
+def group_tags_exist(groups):
+    """Теги групп, которые есть в трекере (запрос с несуществующим тегом YouTrack отклоняет)."""
+    tags = api("GET", "/tags", {"fields": "name", "query": GROUP_PREFIX, "$top": 500}) or []
+    return [g for g in groups if g in {t["name"] for t in tags}]
+
+
 def cmd_search(args):
-    issues = api("GET", "/issues", {"query": args.query, "$top": args.top,
-                                    "fields": "idReadable,summary,customFields(name,value(name))"})
+    query = args.query
+    if args.group:
+        groups = group_tags_exist(args.group)
+        if not groups:
+            print(f"Найдено: 0 - тегов {', '.join(args.group)} в трекере ещё нет")
+            return
+        query += " (" + " or ".join(f"tag: {{{g}}}" for g in groups) + ")"
+    issues = api("GET", "/issues", {"query": query, "$top": args.top,
+                                    "fields": "idReadable,summary,tags(name),customFields(name,value(name))"})
+    skip = set(args.skip_group or [])
+    issues = [i for i in issues if not skip & {t["name"] for t in i.get("tags") or []}]
     for i in issues:
         f = {c["name"]: field_value(c["value"]) for c in i["customFields"]}
-        print(f'{i["idReadable"]:<10} [{f.get("State", "")}] {i["summary"]}')
+        groups = [t["name"] for t in i.get("tags") or [] if t["name"].startswith(GROUP_PREFIX)]
+        print(f'{i["idReadable"]:<10} [{f.get("State", "")}] {i["summary"]}' + (f'  {{{", ".join(groups)}}}' if groups else ""))
     print(f"Найдено: {len(issues)} (показано не больше {args.top})")
 
 
@@ -106,8 +125,13 @@ RESTRICTED_TAG = "ai-restricted"   # описание и комментарии 
 
 def cmd_show(args):
     i = api("GET", f"/issues/{args.id}", {"fields": ISSUE_FIELDS})
-    if RESTRICTED_TAG in {t["name"] for t in i.get("tags") or []} and not args.human:
+    tags = {t["name"] for t in i.get("tags") or []}
+    if RESTRICTED_TAG in tags and not args.human:
         i["description"] = f"[скрыто: тег {RESTRICTED_TAG} - описание читает человек; показать: --human]"
+        i["comments"] = []
+    foreign = sorted(t for t in tags if t.startswith(GROUP_PREFIX) and t not in (args.group or []))
+    if args.group and foreign and not args.human:      # задача другой группы безопасности - не в контекст сессии группы
+        i["description"] = f"[скрыто: группа {', '.join(foreign)} - не группа сессии ({', '.join(args.group)})]"
         i["comments"] = []
     if args.json:
         print(json.dumps(i, ensure_ascii=False, indent=2))
@@ -226,12 +250,15 @@ def main():
     p = sub.add_parser("search", help="поиск задач (язык запросов YouTrack)")
     p.add_argument("query")
     p.add_argument("--top", type=int, default=20)
+    p.add_argument("--group", action="append", help="только задачи с тегом группы безопасности (sg-..., можно несколько)")
+    p.add_argument("--skip-group", action="append", help="без задач с тегом этой группы (например sg-restricted)")
     p.set_defaults(fn=cmd_search)
 
     p = sub.add_parser("show", help="задача целиком: поля, связи, описание, комментарии")
     p.add_argument("id")
     p.add_argument("--json", action="store_true")
     p.add_argument("--human", action="store_true", help=f"показать описание задачи с тегом {RESTRICTED_TAG} (запускает человек)")
+    p.add_argument("--group", action="append", help="группа сессии (sg-...): у задачи с тегом другой группы описание скрыто")
     p.set_defaults(fn=cmd_show)
 
     def with_text(p):
