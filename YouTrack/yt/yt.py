@@ -8,6 +8,7 @@
 Адрес: env YOUTRACK_URL, иначе первая ссылка https://... из файла токена.
 """
 import argparse
+import datetime as dt
 import json
 import os
 import re
@@ -153,6 +154,59 @@ def cmd_show(args):
         print(f'\n--- Комментарий {c["id"]} ({c["author"]["login"]}) ---\n{c["text"]}')
 
 
+DAY_START_HOUR = 8   # рабочие сутки - с 08:00 до 08:00: работа после полуночи идёт в предыдущий день
+
+
+def day_bounds(date):
+    """Границы рабочих суток date (местное время) в мс эпохи."""
+    start = dt.datetime.combine(dt.date.fromisoformat(date), dt.time(DAY_START_HOUR))
+    return int(start.timestamp() * 1000), int((start + dt.timedelta(days=1)).timestamp() * 1000)
+
+
+def ms_local(ms):
+    return dt.datetime.fromtimestamp(ms / 1000).strftime("%Y-%m-%d %H:%M")
+
+
+def cmd_team(args):
+    p = api("GET", f"/admin/projects/{args.project}", {"fields": "team(users(login,name,banned))"})
+    for u in p["team"]["users"]:
+        if not u.get("banned"):
+            print(f'{u["login"]:<20} {u["name"]}')
+
+
+def cmd_day(args):
+    """Что было у человека за рабочие сутки: назначенные задачи, его комментарии, списанное время."""
+    login = args.author or api("GET", "/users/me", {"fields": "login"})["login"]
+    start, end = day_bounds(args.date)
+    print(f"=== {login}, {args.date} (сутки с {DAY_START_HOUR:02d}:00) ===")
+
+    print("\n--- Назначенные открытые задачи ---")
+    for i in api("GET", "/issues", {"query": f"Assignee: {login} #Unresolved", "$top": 100,
+                                    "fields": "idReadable,summary,customFields(name,value(name))"}):
+        f = {c["name"]: field_value(c["value"]) for c in i["customFields"]}
+        print(f'{i["idReadable"]:<10} [{f.get("State", "")}] {i["summary"]}')
+
+    print("\n--- Комментарии ---")
+    day = dt.date.fromisoformat(args.date)
+    query = f"commenter: {login} commented: {day} .. {day + dt.timedelta(days=1)}"
+    for i in api("GET", "/issues", {"query": query, "$top": 100,
+                                    "fields": "idReadable,summary,comments(created,text,author(login))"}):
+        for c in i.get("comments") or []:
+            if c["author"]["login"] == login and start <= c["created"] < end:
+                text = " ".join((c["text"] or "").split())
+                print(f'{i["idReadable"]:<10} {ms_local(c["created"])}  {text[:args.width]}')
+
+    print("\n--- Списанное время ---")
+    total = 0
+    for w in api("GET", "/workItems", {"author": login, "startDate": args.date, "endDate": args.date, "$top": 500,
+                                       "fields": "date,duration(minutes,presentation),text,issue(idReadable,summary)"}):
+        total += w["duration"]["minutes"]
+        text = " ".join((w.get("text") or "").split())
+        print(f'{w["issue"]["idReadable"]:<10} {w["duration"]["presentation"]:>8}  {w["issue"]["summary"]}'
+              + (f"  - {text[:args.width]}" if text else ""))
+    print(f"Итого списано: {total // 60} ч {total % 60} мин")
+
+
 # --- изменения (черновик / --apply) ---
 
 def run_command(issue_ids, query):
@@ -238,6 +292,17 @@ def cmd_command(args):
         print("Команда применена")
 
 
+def cmd_work(args):
+    text = read_text(args) if (args.text or args.file) else ""
+    date = dt.datetime.combine(dt.date.fromisoformat(args.date), dt.time(12))
+    draft(f"списание времени в {args.id}", [f"Дата: {args.date}", f"Время: {args.duration}", f"Что сделано: {text or '-'}"],
+          args.apply)
+    if args.apply:
+        w = api("POST", f"/issues/{args.id}/timeTracking/workItems", {"fields": "id,duration(presentation)"},
+                {"date": int(date.timestamp() * 1000), "duration": {"presentation": args.duration}, "text": text})
+        print("Списано", w["duration"]["presentation"], "- запись", w["id"])
+
+
 def main():
     global BASE, TOKEN
     for s in (sys.stdout, sys.stderr):
@@ -260,6 +325,16 @@ def main():
     p.add_argument("--human", action="store_true", help=f"показать описание задачи с тегом {RESTRICTED_TAG} (запускает человек)")
     p.add_argument("--group", action="append", help="группа сессии (sg-...): у задачи с тегом другой группы описание скрыто")
     p.set_defaults(fn=cmd_show)
+
+    p = sub.add_parser("team", help="участники проекта (состав отдела - TES)")
+    p.add_argument("project", nargs="?", default="TES")
+    p.set_defaults(fn=cmd_team)
+
+    p = sub.add_parser("day", help="за рабочие сутки: назначенные задачи, комментарии, списанное время")
+    p.add_argument("--date", default=dt.date.today().isoformat(), help="YYYY-MM-DD (по умолчанию сегодня)")
+    p.add_argument("--author", help="логин (по умолчанию владелец токена)")
+    p.add_argument("--width", type=int, default=160, help="обрезать текст комментария до N символов")
+    p.set_defaults(fn=cmd_day)
 
     def with_text(p):
         p.add_argument("--text")
@@ -292,6 +367,13 @@ def main():
     p.add_argument("--no-tag", action="store_true", help=f"не ставить тег {AI_TAG}")
     with_text(p)
     p.set_defaults(fn=cmd_create)
+
+    p = sub.add_parser("work", help="списать время в задачу (worklog)")
+    p.add_argument("id")
+    p.add_argument("duration", help="'1h 30m', '45m'")
+    p.add_argument("--date", default=dt.date.today().isoformat(), help="YYYY-MM-DD - день работы")
+    with_text(p)
+    p.set_defaults(fn=cmd_work)
 
     p = sub.add_parser("link", help="связь между задачами")
     p.add_argument("id")
