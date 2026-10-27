@@ -295,11 +295,18 @@ def cmd_command(args):
 def cmd_work(args):
     text = read_text(args) if (args.text or args.file) else ""
     date = dt.datetime.combine(dt.date.fromisoformat(args.date), dt.time(12))
-    draft(f"списание времени в {args.id}", [f"Дата: {args.date}", f"Время: {args.duration}", f"Что сделано: {text or '-'}"],
-          args.apply)
+    body = {"date": int(date.timestamp() * 1000), "duration": {"presentation": args.duration}, "text": text}
+    if args.type:
+        project = api("GET", f"/issues/{args.id}", {"fields": "project(id)"})["project"]["id"]
+        types = api("GET", f"/admin/projects/{project}/timeTrackingSettings", {"fields": "workItemTypes(id,name)"})
+        found = [t for t in types["workItemTypes"] if t["name"] == args.type]
+        if not found:
+            sys.exit(f"Нет типа работы «{args.type}»: " + ", ".join(t["name"] for t in types["workItemTypes"]))
+        body["type"] = {"id": found[0]["id"]}
+    draft(f"списание времени в {args.id}", [f"Дата: {args.date}", f"Время: {args.duration}",
+                                             f"Тип: {args.type or '-'}", f"Что сделано: {text or '-'}"], args.apply)
     if args.apply:
-        w = api("POST", f"/issues/{args.id}/timeTracking/workItems", {"fields": "id,duration(presentation)"},
-                {"date": int(date.timestamp() * 1000), "duration": {"presentation": args.duration}, "text": text})
+        w = api("POST", f"/issues/{args.id}/timeTracking/workItems", {"fields": "id,duration(presentation)"}, body)
         print("Списано", w["duration"]["presentation"], "- запись", w["id"])
 
 
@@ -372,6 +379,7 @@ def main():
     p.add_argument("id")
     p.add_argument("duration", help="'1h 30m', '45m'")
     p.add_argument("--date", default=dt.date.today().isoformat(), help="YYYY-MM-DD - день работы")
+    p.add_argument("--type", help="тип работы, напр. 'Исследование', 'Документирование'")
     with_text(p)
     p.set_defaults(fn=cmd_work)
 
