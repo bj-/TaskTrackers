@@ -1,3 +1,4 @@
 # Собранные архивы workflow — артефакты сборки
 *.zip
 /YouTrack/log
+*.pyc
